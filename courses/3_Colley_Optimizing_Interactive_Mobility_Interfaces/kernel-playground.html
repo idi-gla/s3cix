@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>The Kernel, Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0C1A1B;
+    --panel:#102323;
+    --panel-2:#15302E;
+    --grid:rgba(120,170,165,.13);
+    --line:rgba(140,180,175,.16);
+    --ink:#E9EEEC;
+    --muted:#86A39D;
+    --amber:#F0B23C;
+    --amber-soft:rgba(240,178,60,.16);
+    --teal:#57D6C6;
+    --teal-band:rgba(87,214,198,.15);
+    --cream:#F5F0E4;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:"Space Grotesk",system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;}
+  body{padding:22px 16px 40px;}
+  .wrap{max-width:540px;margin:0 auto;}
+
+  .eyebrow{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--teal);margin:0 0 8px;}
+  h1{font-size:27px;line-height:1.05;font-weight:700;margin:0 0 8px;letter-spacing:-.01em;}
+  h1 em{font-style:normal;color:var(--amber);}
+  .lede{font-size:14px;line-height:1.45;color:var(--muted);margin:0 0 20px;max-width:46ch;}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    overflow:hidden;margin-bottom:14px;}
+  .plot-head{display:flex;justify-content:space-between;align-items:baseline;
+    padding:13px 15px 0;}
+  .plot-head .t{font-size:12px;font-weight:500;letter-spacing:.02em;}
+  .plot-head .meta{font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--muted);}
+  canvas{display:block;width:100%;touch-action:none;}
+  .hint{font-size:11.5px;color:var(--muted);padding:6px 15px 13px;line-height:1.4;}
+  .hint b{color:var(--cream);font-weight:500;}
+
+  /* formula */
+  .formula{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;
+    padding:16px 15px;margin-bottom:14px;}
+  .formula .symb{font-family:"JetBrains Mono",monospace;font-size:16.5px;line-height:1.5;
+    text-align:center;color:var(--ink);white-space:nowrap;overflow-x:auto;}
+  .tok{transition:color .25s,background .25s;border-radius:4px;padding:1px 3px;}
+  .tok.sig{color:var(--teal);}
+  .tok.len{color:var(--amber);}
+  .tok.lit{background:rgba(255,255,255,.10);}
+  .formula .num{font-family:"JetBrains Mono",monospace;font-size:12px;text-align:center;
+    color:var(--muted);margin-top:9px;}
+
+  /* sliders */
+  .controls{display:flex;flex-direction:column;gap:16px;margin-bottom:14px;}
+  .ctl{}
+  .ctl .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;}
+  .ctl .name{font-size:13px;font-weight:500;}
+  .ctl .name .sym{font-family:"JetBrains Mono",monospace;}
+  .ctl .name.sig .sym{color:var(--teal);}
+  .ctl .name.len .sym{color:var(--amber);}
+  .ctl .val{font-family:"JetBrains Mono",monospace;font-size:13px;font-weight:600;color:var(--ink);}
+  .ctl .sub{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35;}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:30px;
+    background:transparent;cursor:pointer;margin:0;}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:3px;
+    background:rgba(140,180,175,.22);}
+  input[type=range]::-moz-range-track{height:4px;border-radius:3px;background:rgba(140,180,175,.22);}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:20px;height:20px;border-radius:50%;background:var(--ink);margin-top:-8px;
+    border:3px solid var(--bg);box-shadow:0 0 0 1px var(--line);}
+  input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;
+    background:var(--ink);border:3px solid var(--bg);box-shadow:0 0 0 1px var(--line);}
+  input.sig::-webkit-slider-thumb{background:var(--teal);}
+  input.sig::-moz-range-thumb{background:var(--teal);}
+  input.len::-webkit-slider-thumb{background:var(--amber);}
+  input.len::-moz-range-thumb{background:var(--amber);}
+  input[type=range]:focus-visible{outline:2px solid var(--teal);outline-offset:4px;border-radius:6px;}
+
+  .btns{display:flex;gap:10px;}
+  button{flex:1;font-family:"Space Grotesk",sans-serif;font-size:13px;font-weight:500;
+    color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:11px;
+    padding:11px;cursor:pointer;transition:background .15s,border-color .15s;}
+  button:hover{background:var(--panel-2);}
+  button:active{background:var(--panel-2);}
+  button:focus-visible{outline:2px solid var(--teal);outline-offset:2px;}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted);
+    padding:0 2px;margin-top:14px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .sw{width:16px;height:3px;border-radius:2px;display:inline-block;}
+  .sw.dot{width:9px;height:9px;border-radius:50%;}
+
+  @media (prefers-reduced-motion: reduce){
+    .tok{transition:none;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Similarity dial</p>
+  <h1>The kernel, <em>live</em></h1>
+  <p class="lede">Tap the graph to drop points you've “tried.” The amber line is the model's best guess between them; the glow is how unsure it is. Now turn the knobs and watch both move.</p>
+
+  <!-- GP plot -->
+  <div class="card">
+    <div class="plot-head">
+      <span class="t">Guess &amp; confidence</span>
+      <span class="meta" id="ptmeta">0 points</span>
+    </div>
+    <canvas id="gp"></canvas>
+    <p class="hint">Tap empty space to <b>add</b> a point · tap a point to <b>remove</b> it.</p>
+  </div>
+
+  <!-- formula -->
+  <div class="formula">
+    <div class="symb">
+      k(x,&nbsp;x′) = <span class="tok sig" id="tk-sig">σ²</span> · exp(&nbsp;−&nbsp;|x−x′|²&nbsp;/&nbsp;(&nbsp;2&nbsp;<span class="tok len" id="tk-len">ℓ²</span>&nbsp;)&nbsp;)
+    </div>
+    <div class="num" id="fnum">= 1.00 · exp( − d² / ( 2 × 1.00² ) )</div>
+  </div>
+
+  <!-- sliders -->
+  <div class="controls">
+    <div class="ctl">
+      <div class="top">
+        <span class="name len">Lengthscale <span class="sym">ℓ</span></span>
+        <span class="val" id="v-ell">1.00</span>
+      </div>
+      <input class="len" type="range" id="s-ell" min="0.3" max="4" step="0.01" value="1" aria-label="Lengthscale">
+      <div class="sub">How far each point's influence spreads. Small = wiggly, only close points count. Large = smooth, sweeping guesses.</div>
+    </div>
+
+    <div class="ctl">
+      <div class="top">
+        <span class="name sig">Scale <span class="sym">σ²</span></span>
+        <span class="val" id="v-sig">1.00</span>
+      </div>
+      <input class="sig" type="range" id="s-sig" min="0.25" max="3" step="0.01" value="1" aria-label="Scale">
+      <div class="sub">How big the ups and downs get. The volume knob — it grows the whole glow and the size of the swings.</div>
+    </div>
+
+    <div class="ctl">
+      <div class="top">
+        <span class="name">Noise <span class="sym">σ²ₙ</span></span>
+        <span class="val" id="v-noz">0.010</span>
+      </div>
+      <input type="range" id="s-noz" min="0.0001" max="0.6" step="0.0001" value="0.01" aria-label="Noise">
+      <div class="sub">How messy / unreliable each point is. Near zero, the line threads exactly through them; turn it up and it stops trusting them.</div>
+    </div>
+  </div>
+
+  <div class="btns">
+    <button id="b-clear">Clear points</button>
+    <button id="b-draw">New sample curves</button>
+  </div>
+
+  <!-- kernel shape -->
+  <div class="card" style="margin-top:14px;">
+    <div class="plot-head">
+      <span class="t">The kernel itself</span>
+      <span class="meta">similarity vs. distance</span>
+    </div>
+    <canvas id="kshape"></canvas>
+    <p class="hint">Two points' <b>similarity</b> as they move apart. Identical points (distance 0) score the most; the dashed line marks one lengthscale <b>ℓ</b>, where similarity has noticeably faded.</p>
+  </div>
+
+  <div class="legend">
+    <span><i class="sw" style="background:var(--amber)"></i> best guess</span>
+    <span><i class="sw" style="background:var(--teal);opacity:.55"></i> uncertainty</span>
+    <span><i class="sw" style="background:var(--amber);opacity:.4"></i> possible curves</span>
+    <span><i class="sw dot" style="background:var(--cream)"></i> your points</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---- domain / grid ----
+  const X0 = 0, X1 = 10;            // input range
+  const Y0 = -4, Y1 = 4;            // display range (fixed so scale visibly changes size)
+  const M = 160;                     // grid resolution
+  const xg = new Float64Array(M);
+  for (let i=0;i<M;i++) xg[i] = X0 + (X1-X0)*i/(M-1);
+
+  // precompute squared distances between grid points (grid is fixed)
+  const D2g = new Float64Array(M*M);
+  for (let i=0;i<M;i++) for (let j=0;j<M;j++){ const d=xg[i]-xg[j]; D2g[i*M+j]=d*d; }
+
+  // ---- state ----
+  let ell = 1, sig2 = 1, noise = 0.01;
+  let pts = [ {x:2.2,y:1.4}, {x:5.0,y:-1.1}, {x:7.6,y:0.9} ];
+
+  // seeded RNG for stable, morphing sample curves
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  let rng = mulberry32(20260614);
+  const NS = 3;
+  let Z = [];
+  function newZ(){
+    rng = mulberry32((Math.random()*1e9)|0);
+    Z = [];
+    for (let s=0;s<NS;s++){
+      const z=new Float64Array(M);
+      for (let i=0;i<M;i++){
+        // Box–Muller
+        let u=rng()||1e-9, v=rng();
+        z[i]=Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+      }
+      Z.push(z);
+    }
+  }
+  // fixed initial draws (deterministic first paint)
+  (function initZ(){
+    Z=[];
+    for (let s=0;s<NS;s++){
+      const z=new Float64Array(M);
+      for (let i=0;i<M;i++){ let u=rng()||1e-9, v=rng(); z[i]=Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+      Z.push(z);
+    }
+  })();
+
+  // ---- linear algebra ----
+  function k(d2){ return sig2*Math.exp(-d2/(2*ell*ell)); }
+
+  function chol(A,n){           // lower L, A=LLᵀ ; returns null if not PD
+    const L=new Float64Array(n*n);
+    for (let i=0;i<n;i++){
+      for (let j=0;j<=i;j++){
+        let s=A[i*n+j];
+        for (let p=0;p<j;p++) s-=L[i*n+p]*L[j*n+p];
+        if (i===j){ if (s<=0) return null; L[i*n+i]=Math.sqrt(s); }
+        else L[i*n+j]=s/L[j*n+j];
+      }
+    }
+    return L;
+  }
+  function solveLower(L,n,b){    // L y = b
+    const y=new Float64Array(n);
+    for (let i=0;i<n;i++){ let s=b[i]; for (let p=0;p<i;p++) s-=L[i*n+p]*y[p]; y[i]=s/L[i*n+i]; }
+    return y;
+  }
+  function solveChol(L,n,b){     // (LLᵀ) x = b
+    const y=solveLower(L,n,b);
+    const x=new Float64Array(n);
+    for (let i=n-1;i>=0;i--){ let s=y[i]; for (let p=i+1;p<n;p++) s-=L[p*n+i]*x[p]; x[i]=s/L[i*n+i]; }
+    return x;
+  }
+
+  // ---- GP compute ----
+  let meanArr=new Float64Array(M), sdArr=new Float64Array(M), samples=[];
+  function computeGP(){
+    const n=pts.length;
+    // predictive mean + sd
+    if (n===0){
+      meanArr.fill(0);
+      const sd=Math.sqrt(Math.max(sig2,0));
+      sdArr.fill(sd);
+    } else {
+      // K + (noise) I  (+ jitter)
+      const K=new Float64Array(n*n);
+      const jit=1e-6*sig2+1e-9;
+      for (let i=0;i<n;i++) for (let j=0;j<n;j++){
+        const d=pts[i].x-pts[j].x; let v=k(d*d);
+        if (i===j) v+=noise+jit;
+        K[i*n+j]=v;
+      }
+      let L=chol(K,n), tries=0;
+      while(!L && tries<5){ for(let i=0;i<n;i++) K[i*n+i]+=1e-4*sig2; L=chol(K,n); tries++; }
+      const yv=new Float64Array(n); for(let i=0;i<n;i++) yv[i]=pts[i].y;
+      const alpha=solveChol(L,n,yv);
+      const Ks=new Float64Array(n);     // reused per grid col
+      for (let g=0; g<M; g++){
+        for (let i=0;i<n;i++){ const d=pts[i].x-xg[g]; Ks[i]=k(d*d); }
+        let m=0; for (let i=0;i<n;i++) m+=Ks[i]*alpha[i];
+        const v=solveLower(L,n,Ks);
+        let q=0; for (let i=0;i<n;i++) q+=v[i]*v[i];
+        let varr=sig2-q; if (varr<1e-9) varr=1e-9;
+        meanArr[g]=m; sdArr[g]=Math.sqrt(varr);
+      }
+    }
+    // posterior (or prior) samples over grid
+    samples=[];
+    // build Kss
+    const Kss=new Float64Array(M*M);
+    for (let i=0;i<M*M;i++) Kss[i]=sig2*Math.exp(-D2g[i]/(2*ell*ell));
+    let cov=Kss;
+    if (n>0){
+      // recompute L for cov correction
+      const K=new Float64Array(n*n); const jit=1e-6*sig2+1e-9;
+      for (let i=0;i<n;i++) for (let j=0;j<n;j++){ const d=pts[i].x-pts[j].x; let v=k(d*d); if(i===j)v+=noise+jit; K[i*n+j]=v; }
+      let L=chol(K,n),tries=0; while(!L&&tries<5){for(let i=0;i<n;i++)K[i*n+i]+=1e-4*sig2;L=chol(K,n);tries++;}
+      // V (n x M): solveLower(L, Ks_col) for each grid col
+      const V=new Float64Array(n*M);
+      const ks=new Float64Array(n);
+      for (let g=0; g<M; g++){
+        for (let i=0;i<n;i++){ const d=pts[i].x-xg[g]; ks[i]=k(d*d); }
+        const v=solveLower(L,n,ks);
+        for (let i=0;i<n;i++) V[i*M+g]=v[i];
+      }
+      cov=new Float64Array(M*M);
+      for (let a=0;a<M;a++) for (let b=0;b<M;b++){
+        let s=0; for (let i=0;i<n;i++) s+=V[i*M+a]*V[i*M+b];
+        cov[a*M+b]=Kss[a*M+b]-s;
+      }
+    } else {
+      cov=new Float64Array(Kss); // copy so we can jitter
+    }
+    for (let i=0;i<M;i++) cov[i*M+i]+=1e-6;
+    let Lp=chol(cov,M),t2=0;
+    while(!Lp&&t2<6){ for(let i=0;i<M;i++) cov[i*M+i]+=1e-5; Lp=chol(cov,M); t2++; }
+    if (Lp){
+      for (let s=0;s<NS;s++){
+        const z=Z[s], f=new Float64Array(M);
+        for (let i=0;i<M;i++){ let acc=meanArr[i]; for(let p=0;p<=i;p++) acc+=Lp[i*M+p]*z[p]; f[i]=acc; }
+        samples.push(f);
+      }
+    }
+  }
+
+  // ---- canvas helpers ----
+  function setup(canvas, cssH){
+    const dpr=Math.min(window.devicePixelRatio||1,2.5);
+    const cssW=canvas.clientWidth||canvas.parentElement.clientWidth;
+    canvas.width=Math.round(cssW*dpr);
+    canvas.height=Math.round(cssH*dpr);
+    canvas.style.height=cssH+"px";
+    const ctx=canvas.getContext("2d");
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    return {ctx,w:cssW,h:cssH};
+  }
+  const PAD={l:8,r:8,t:10,b:10};
+  const sx=(w,x)=> PAD.l + (x-X0)/(X1-X0)*(w-PAD.l-PAD.r);
+  const sy=(h,y)=> PAD.t + (Y1-y)/(Y1-Y0)*(h-PAD.t-PAD.b);
+  const ix=(w,px)=> X0 + (px-PAD.l)/(w-PAD.l-PAD.r)*(X1-X0);   // inverse x
+  const iy=(h,py)=> Y1 - (py-PAD.t)/(h-PAD.t-PAD.b)*(Y1-Y0);   // inverse y
+
+  // ---- draw GP ----
+  const gpCanvas=document.getElementById("gp");
+  function drawGP(){
+    const H=Math.max(220,Math.min(300,Math.round(gpCanvas.parentElement.clientWidth*0.62)));
+    const {ctx,w,h}=setup(gpCanvas,H);
+    ctx.clearRect(0,0,w,h);
+    // grid
+    ctx.strokeStyle=getCss('--grid'); ctx.lineWidth=1;
+    ctx.beginPath();
+    for (let gx=X0; gx<=X1; gx+=1){ const X=sx(w,gx); ctx.moveTo(X,PAD.t); ctx.lineTo(X,h-PAD.b); }
+    for (let gy=Y0; gy<=Y1; gy+=2){ const Y=sy(h,gy); ctx.moveTo(PAD.l,Y); ctx.lineTo(w-PAD.r,Y); }
+    ctx.stroke();
+    // zero line
+    ctx.strokeStyle="rgba(140,180,175,.30)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(PAD.l,sy(h,0)); ctx.lineTo(w-PAD.r,sy(h,0)); ctx.stroke();
+
+    // sample curves (faint amber)
+    ctx.lineWidth=1.25; ctx.strokeStyle="rgba(240,178,60,.34)";
+    for (const f of samples){
+      ctx.beginPath();
+      for (let i=0;i<M;i++){ const X=sx(w,xg[i]),Y=sy(h,f[i]); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); }
+      ctx.stroke();
+    }
+
+    // uncertainty band (mean ± 1.96 sd)
+    ctx.beginPath();
+    for (let i=0;i<M;i++){ const X=sx(w,xg[i]),Y=sy(h,meanArr[i]+1.96*sdArr[i]); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); }
+    for (let i=M-1;i>=0;i--){ const X=sx(w,xg[i]),Y=sy(h,meanArr[i]-1.96*sdArr[i]); ctx.lineTo(X,Y); }
+    ctx.closePath();
+    ctx.fillStyle=getCss('--teal-band'); ctx.fill();
+    // band edges glow
+    ctx.save();
+    ctx.shadowColor="rgba(87,214,198,.55)"; ctx.shadowBlur=8;
+    ctx.strokeStyle="rgba(87,214,198,.5)"; ctx.lineWidth=1;
+    for (const sgn of [1,-1]){
+      ctx.beginPath();
+      for (let i=0;i<M;i++){ const X=sx(w,xg[i]),Y=sy(h,meanArr[i]+sgn*1.96*sdArr[i]); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // mean line (amber, glow)
+    ctx.save();
+    ctx.shadowColor="rgba(240,178,60,.6)"; ctx.shadowBlur=12;
+    ctx.strokeStyle=getCss('--amber'); ctx.lineWidth=2.4; ctx.lineJoin="round";
+    ctx.beginPath();
+    for (let i=0;i<M;i++){ const X=sx(w,xg[i]),Y=sy(h,meanArr[i]); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); }
+    ctx.stroke();
+    ctx.restore();
+
+    // data points
+    for (const p of pts){
+      const X=sx(w,p.x), Y=sy(h,p.y);
+      ctx.beginPath(); ctx.arc(X,Y,7,0,2*Math.PI);
+      ctx.fillStyle="rgba(12,26,27,.9)"; ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle=getCss('--cream'); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X,Y,2.4,0,2*Math.PI); ctx.fillStyle=getCss('--cream'); ctx.fill();
+    }
+  }
+
+  // ---- draw kernel shape ----
+  const ksCanvas=document.getElementById("kshape");
+  function drawShape(){
+    const H=140;
+    const {ctx,w,h}=setup(ksCanvas,H);
+    ctx.clearRect(0,0,w,h);
+    const R0=0,R1=6, S0=0,S1=3;     // distance range / similarity range
+    const pad={l:10,r:10,t:12,b:18};
+    const X=r=> pad.l + (r-R0)/(R1-R0)*(w-pad.l-pad.r);
+    const Yf=s=> pad.t + (S1-s)/(S1-S0)*(h-pad.t-pad.b);
+    // grid
+    ctx.strokeStyle=getCss('--grid'); ctx.lineWidth=1; ctx.beginPath();
+    for (let r=R0;r<=R1;r+=1){ ctx.moveTo(X(r),pad.t); ctx.lineTo(X(r),h-pad.b); }
+    for (let s=S0;s<=S1;s+=1){ ctx.moveTo(pad.l,Yf(s)); ctx.lineTo(w-pad.r,Yf(s)); }
+    ctx.stroke();
+    // peak line at sig2
+    ctx.strokeStyle="rgba(87,214,198,.35)"; ctx.setLineDash([3,3]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(pad.l,Yf(Math.min(sig2,S1))); ctx.lineTo(w-pad.r,Yf(Math.min(sig2,S1))); ctx.stroke();
+    ctx.setLineDash([]);
+    // curve + fill
+    ctx.beginPath();
+    let started=false;
+    const pathPts=[];
+    for (let px=pad.l; px<=w-pad.r; px+=1){
+      const r=R0+(px-pad.l)/(w-pad.l-pad.r)*(R1-R0);
+      const s=sig2*Math.exp(-r*r/(2*ell*ell));
+      const Y=Yf(Math.min(s,S1));
+      pathPts.push([px,Y]);
+      if(!started){ctx.moveTo(px,Y);started=true;} else ctx.lineTo(px,Y);
+    }
+    // fill to baseline
+    ctx.lineTo(w-pad.r,Yf(0)); ctx.lineTo(pad.l,Yf(0)); ctx.closePath();
+    ctx.fillStyle="rgba(87,214,198,.10)"; ctx.fill();
+    // stroke curve
+    ctx.beginPath();
+    for (let i=0;i<pathPts.length;i++){ const[px,Y]=pathPts[i]; i?ctx.lineTo(px,Y):ctx.moveTo(px,Y); }
+    ctx.strokeStyle=getCss('--teal'); ctx.lineWidth=2; ctx.stroke();
+    // lengthscale marker
+    if (ell<=R1){
+      ctx.strokeStyle="rgba(240,178,60,.7)"; ctx.setLineDash([4,3]); ctx.lineWidth=1.4;
+      ctx.beginPath(); ctx.moveTo(X(ell),pad.t); ctx.lineTo(X(ell),h-pad.b); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle=getCss('--amber'); ctx.font='600 11px "JetBrains Mono",monospace';
+      ctx.textAlign="left"; ctx.fillText("ℓ", X(ell)+4, pad.t+11);
+    }
+    // axis ticks
+    ctx.fillStyle=getCss('--muted'); ctx.font='10px "JetBrains Mono",monospace'; ctx.textAlign="center";
+    ctx.fillText("0", X(0), h-5);
+    ctx.fillText("distance →", (pad.l+w-pad.r)/2, h-5);
+  }
+
+  function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+  // ---- readouts ----
+  function fmt(x,d){ return x.toFixed(d); }
+  function updateReadouts(){
+    document.getElementById("v-ell").textContent=fmt(ell,2);
+    document.getElementById("v-sig").textContent=fmt(sig2,2);
+    document.getElementById("v-noz").textContent=fmt(noise,3);
+    document.getElementById("fnum").textContent =
+      "= "+fmt(sig2,2)+" · exp( − d² / ( 2 × "+fmt(ell,2)+"² ) )";
+    const n=pts.length;
+    document.getElementById("ptmeta").textContent = n+(n===1?" point":" points");
+  }
+  let litTimer=null;
+  function lit(id){
+    if (reduceMotion) return;
+    const el=document.getElementById(id); el.classList.add("lit");
+    clearTimeout(litTimer); litTimer=setTimeout(()=>{
+      document.getElementById("tk-sig").classList.remove("lit");
+      document.getElementById("tk-len").classList.remove("lit");
+    },550);
+  }
+
+  // ---- render scheduling ----
+  let dirty=true, raf=null;
+  function schedule(){ dirty=true; if(!raf) raf=requestAnimationFrame(frame); }
+  function frame(){
+    raf=null;
+    if (dirty){ dirty=false; computeGP(); drawGP(); drawShape(); }
+  }
+  function full(){ updateReadouts(); schedule(); }
+
+  // ---- events ----
+  document.getElementById("s-ell").addEventListener("input",e=>{ ell=+e.target.value; lit("tk-len"); full(); });
+  document.getElementById("s-sig").addEventListener("input",e=>{ sig2=+e.target.value; lit("tk-sig"); full(); });
+  document.getElementById("s-noz").addEventListener("input",e=>{ noise=+e.target.value; full(); });
+  document.getElementById("b-clear").addEventListener("click",()=>{ pts=[]; full(); });
+  document.getElementById("b-draw").addEventListener("click",()=>{ newZ(); full(); });
+
+  gpCanvas.addEventListener("pointerdown",e=>{
+    e.preventDefault();
+    const rect=gpCanvas.getBoundingClientRect();
+    const w=rect.width, h=rect.height;
+    const px=e.clientX-rect.left, py=e.clientY-rect.top;
+    // remove if near an existing point
+    let hit=-1, best=18;
+    for (let i=0;i<pts.length;i++){
+      const dx=sx(w,pts[i].x)-px, dy=sy(h,pts[i].y)-py;
+      const d=Math.hypot(dx,dy); if (d<best){best=d;hit=i;}
+    }
+    if (hit>=0){ pts.splice(hit,1); }
+    else if (pts.length<14){
+      const X=Math.max(X0,Math.min(X1,ix(w,px)));
+      const Y=Math.max(Y0,Math.min(Y1,iy(h,py)));
+      pts.push({x:X,y:Y});
+    }
+    full();
+  });
+
+  let rT=null;
+  window.addEventListener("resize",()=>{ clearTimeout(rT); rT=setTimeout(()=>{ schedule(); },120); });
+
+  // init
+  updateReadouts();
+  // wait a tick for fonts/layout, then first paint
+  requestAnimationFrame(()=>{ schedule(); });
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(()=>schedule()); }
+})();
+</script>
+</body>
+</html>
